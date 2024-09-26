@@ -1,188 +1,209 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
-export default function FormPage() {
-  // สถานะเพื่อเช็คว่าฟอร์มได้ถูก mount แล้ว
-  const [isMounted, setIsMounted] = useState(false);
-
-  // useEffect สำหรับตั้งค่าว่า mount เรียบร้อยแล้ว
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    feedback: '',
-    question1: '',
-    question2: '',
-    question3: '',
-    question4: '',
-    question5: '',
+export default function EvaluationPage() {
+  const [currentUser, setCurrentUser] = useState(1); // นับผู้ใช้คนปัจจุบัน
+  const [evaluationsA, setEvaluationsA] = useState([]); // เก็บข้อมูลของผู้ใช้ทั้งหมดสำหรับชุด A
+  const [evaluationsB, setEvaluationsB] = useState([]); // เก็บข้อมูลของผู้ใช้ทั้งหมดสำหรับชุด B
+  const [currentEvaluation, setCurrentEvaluation] = useState({
+    packaging: '',
+    sharpness: '',
+    flexibility: '',
+    strength: '',
   });
+  const [group, setGroup] = useState('A'); // ระบุว่ากำลังประเมินชุดไหน A หรือ B
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+  const [averageScoreA, setAverageScoreA] = useState(null); // ค่าเฉลี่ยสำหรับชุด A
+  const [averageScoreB, setAverageScoreB] = useState(null); // ค่าเฉลี่ยสำหรับชุด B
+
+  const [priceA, setPriceA] = useState(''); // ราคา บริษัท A
+  const [priceB, setPriceB] = useState(''); // ราคา บริษัท B
+  const [finalScoreA, setFinalScoreA] = useState(null); // คะแนนรวมสุดท้ายสำหรับ A
+  const [finalScoreB, setFinalScoreB] = useState(null); // คะแนนรวมสุดท้ายสำหรับ B
+
+  const [priceScoreA, setPriceScoreA] = useState(null);
+  const [priceScoreB, setPriceScoreB] = useState(null);
+
+  const handleEvaluationChange = (field, value) => {
+    setCurrentEvaluation({ ...currentEvaluation, [field]: value });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    const response = await fetch('/api/form', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(formData),
-    });
 
-    if (response.ok) {
-      alert('Data saved successfully!');
+    // คำนวณคะแนนรวมสำหรับผู้ใช้ปัจจุบัน
+    const totalScore =
+      Number(currentEvaluation.packaging) +
+      Number(currentEvaluation.sharpness) +
+      Number(currentEvaluation.flexibility) +
+      Number(currentEvaluation.strength);
+
+    if (group === 'A') {
+      // บันทึกข้อมูลผู้ใช้สำหรับชุด A
+      setEvaluationsA([...evaluationsA, { ...currentEvaluation, totalScore }]);
     } else {
-      alert('Error saving data!');
+      // บันทึกข้อมูลผู้ใช้สำหรับชุด B
+      setEvaluationsB([...evaluationsB, { ...currentEvaluation, totalScore }]);
+    }
+
+    // รีเซ็ตข้อมูลสำหรับผู้ใช้ถัดไป
+    setCurrentEvaluation({ packaging: '', sharpness: '', flexibility: '', strength: '' });
+
+    // ไปยังผู้ใช้ถัดไป
+    if (currentUser < 5) {
+      setCurrentUser(currentUser + 1);
+    } else {
+      if (group === 'A') {
+        calculateAverage(evaluationsA, setAverageScoreA); // คำนวณคะแนนเฉลี่ยสำหรับชุด A
+        setGroup('B'); // เปลี่ยนเป็นประเมินชุด B
+      } else {
+        calculateAverage(evaluationsB, setAverageScoreB); // คำนวณคะแนนเฉลี่ยสำหรับชุด B
+      }
+      setCurrentUser(1); // เริ่มที่ผู้ใช้คนแรกอีกครั้งสำหรับชุดใหม่
     }
   };
 
-  // ถ้า component ยังไม่ mount ให้แสดง null หรือ Skeleton UI
-  if (!isMounted) {
-    return null;
-  }
+  const calculateAverage = (evaluations, setAverageScore) => {
+    // คำนวณค่าเฉลี่ยจากคะแนนรวมของผู้ใช้ทั้งหมด
+    const totalScores = evaluations.reduce((acc, evalObj) => acc + evalObj.totalScore, 0);
+    const avgScore = totalScores / evaluations.length;
+
+    // เก็บค่าเฉลี่ยลงใน state
+    setAverageScore(avgScore);
+  };
+
+  const calculatePriceScore = () => {
+    // คำนวณคะแนนจากราคา
+    const priceAVal = Number(priceA);
+    const priceBVal = Number(priceB);
+
+    let scoreA, scoreB;
+
+    if (priceAVal < priceBVal) {
+      scoreA = 100;
+      scoreB = 100 - ((priceBVal - priceAVal) / priceAVal) * 100;
+    } else {
+      scoreB = 100;
+      scoreA = 100 - ((priceAVal - priceBVal) / priceBVal) * 100;
+    }
+
+    setPriceScoreA((scoreA / 100) * 40); // แปลงคะแนนเป็น 40%
+    setPriceScoreB((scoreB / 100) * 40); // แปลงคะแนนเป็น 40%
+  };
+
+  const calculateFinalScore = (priceScore, avgScore) => {
+    const productScore = (avgScore / 100) * 60; // แปลงคะแนนผลิตภัณฑ์เป็น 60%
+    return productScore + priceScore; // รวมคะแนนราคากับคะแนนผลิตภัณฑ์
+  };
+
+  const handleFinalCalculation = () => {
+    calculatePriceScore();
+
+    if (averageScoreA) {
+      setFinalScoreA(calculateFinalScore(priceScoreA, averageScoreA));
+    }
+    if (averageScoreB) {
+      setFinalScoreB(calculateFinalScore(priceScoreB, averageScoreB));
+    }
+  };
 
   return (
     <div>
-      <h1>แบบสอบถาม</h1>
+      <h1>แบบประเมินการใช้งานสำหรับผู้ใช้ลำดับ {currentUser} ชุด {group}</h1>
       <form onSubmit={handleSubmit}>
-        {/* ชื่อและอีเมล */}
         <div>
-          <label>ชื่อ:</label>
-          <input
-            type="text"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-          />
+          <label>ภาชนะบรรจุภัณฑ์ (10 คะแนน):</label>
+          <input type="number" value={currentEvaluation.packaging} onChange={(e) => handleEvaluationChange('packaging', e.target.value)} />
         </div>
         <div>
-          <label>อีเมล:</label>
-          <input
-            type="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-          />
+          <label>ความคมของเข็ม (30 คะแนน):</label>
+          <input type="number" value={currentEvaluation.sharpness} onChange={(e) => handleEvaluationChange('sharpness', e.target.value)} />
         </div>
         <div>
-          <label>ความคิดเห็น:</label>
-          <textarea
-            name="feedback"
-            value={formData.feedback}
-            onChange={handleChange}
-          ></textarea>
+          <label>ความเหนียวและลื่นของเส้นไหม (30 คะแนน):</label>
+          <input type="number" value={currentEvaluation.flexibility} onChange={(e) => handleEvaluationChange('flexibility', e.target.value)} />
+        </div>
+        <div>
+          <label>ความแข็งแรงระหว่างเข็มกับไหม (30 คะแนน):</label>
+          <input type="number" value={currentEvaluation.strength} onChange={(e) => handleEvaluationChange('strength', e.target.value)} />
         </div>
 
-        {/* คำถาม 1 */}
-        <div>
-          <h3>ข้อ 1: คุณชอบผลไม้ชนิดไหนมากที่สุด?</h3>
-          <div>
-            <label><input type="radio" name="question1" value="apple" onChange={handleChange} /> แอปเปิ้ล</label>
-          </div>
-          <div>
-            <label><input type="radio" name="question1" value="banana" onChange={handleChange} /> กล้วย</label>
-          </div>
-          <div>
-            <label><input type="radio" name="question1" value="orange" onChange={handleChange} /> ส้ม</label>
-          </div>
-          <div>
-            <label><input type="radio" name="question1" value="grape" onChange={handleChange} /> องุ่น</label>
-          </div>
-          <div>
-            <label><input type="radio" name="question1" value="mango" onChange={handleChange} /> มะม่วง</label>
-          </div>
-        </div>
-
-        {/* คำถาม 2 */}
-        <div>
-          <h3>ข้อ 2: คุณชอบเครื่องดื่มชนิดไหน?</h3>
-          <div>
-            <label><input type="radio" name="question2" value="coffee" onChange={handleChange} /> กาแฟ</label>
-          </div>
-          <div>
-            <label><input type="radio" name="question2" value="tea" onChange={handleChange} /> ชา</label>
-          </div>
-          <div>
-            <label><input type="radio" name="question2" value="juice" onChange={handleChange} /> น้ำผลไม้</label>
-          </div>
-          <div>
-            <label><input type="radio" name="question2" value="soda" onChange={handleChange} /> น้ำอัดลม</label>
-          </div>
-          <div>
-            <label><input type="radio" name="question2" value="water" onChange={handleChange} /> น้ำเปล่า</label>
-          </div>
-        </div>
-
-        {/* คำถาม 3 */}
-        <div>
-          <h3>ข้อ 3: คุณชอบสีอะไร?</h3>
-          <div>
-            <label><input type="radio" name="question3" value="red" onChange={handleChange} /> แดง</label>
-          </div>
-          <div>
-            <label><input type="radio" name="question3" value="blue" onChange={handleChange} /> น้ำเงิน</label>
-          </div>
-          <div>
-            <label><input type="radio" name="question3" value="green" onChange={handleChange} /> เขียว</label>
-          </div>
-          <div>
-            <label><input type="radio" name="question3" value="yellow" onChange={handleChange} /> เหลือง</label>
-          </div>
-          <div>
-            <label><input type="radio" name="question3" value="black" onChange={handleChange} /> ดำ</label>
-          </div>
-        </div>
-
-        {/* คำถาม 4 */}
-        <div>
-          <h3>ข้อ 4: คุณชอบกีฬาชนิดไหน?</h3>
-          <div>
-            <label><input type="radio" name="question4" value="football" onChange={handleChange} /> ฟุตบอล</label>
-          </div>
-          <div>
-            <label><input type="radio" name="question4" value="basketball" onChange={handleChange} /> บาสเกตบอล</label>
-          </div>
-          <div>
-            <label><input type="radio" name="question4" value="tennis" onChange={handleChange} /> เทนนิส</label>
-          </div>
-          <div>
-            <label><input type="radio" name="question4" value="swimming" onChange={handleChange} /> ว่ายน้ำ</label>
-          </div>
-          <div>
-            <label><input type="radio" name="question4" value="running" onChange={handleChange} /> วิ่ง</label>
-          </div>
-        </div>
-
-        {/* คำถาม 5 */}
-        <div>
-          <h3>ข้อ 5: คุณชอบอาหารแบบไหน?</h3>
-          <div>
-            <label><input type="radio" name="question5" value="thai" onChange={handleChange} /> อาหารไทย</label>
-          </div>
-          <div>
-            <label><input type="radio" name="question5" value="japanese" onChange={handleChange} /> อาหารญี่ปุ่น</label>
-          </div>
-          <div>
-            <label><input type="radio" name="question5" value="western" onChange={handleChange} /> อาหารตะวันตก</label>
-          </div>
-          <div>
-            <label><input type="radio" name="question5" value="chinese" onChange={handleChange} /> อาหารจีน</label>
-          </div>
-          <div>
-            <label><input type="radio" name="question5" value="indian" onChange={handleChange} /> อาหารอินเดีย</label>
-          </div>
-        </div>
-
-        <button type="submit">ส่งแบบสอบถาม</button>
+        <button type="submit">บันทึกการประเมินผู้ใช้ลำดับ {currentUser}</button>
       </form>
+
+      {/* รับราคาจากผู้ใช้ */}
+      <div>
+        <h3>ประเมินราคาสินค้า</h3>
+        <label>ราคาสินค้า บริษัท A:</label>
+        <input type="number" value={priceA} onChange={(e) => setPriceA(e.target.value)} />
+        <label>ราคาสินค้า บริษัท B:</label>
+        <input type="number" value={priceB} onChange={(e) => setPriceB(e.target.value)} />
+      </div>
+
+      {/* แสดงข้อมูลของผู้ใช้ทั้งหมดเมื่อกรอกครบ 5 คนสำหรับชุด A */}
+      {averageScoreA && (
+        <div>
+          <h2>ผลการประเมินจากชุด A</h2>
+          <h3>คะแนนเฉลี่ยชุด A: {averageScoreA.toFixed(2)}</h3>
+          <h3>คะแนนสุดท้ายจากการประเมิน (คิดเป็น 60%): {(averageScoreA / 100 * 60).toFixed(2)}</h3>
+        </div>
+      )}
+
+      {/* แสดงข้อมูลของผู้ใช้ทั้งหมดเมื่อกรอกครบ 5 คนสำหรับชุด B */}
+      {averageScoreB && (
+        <div>
+          <h2>ผลการประเมินจากชุด B</h2>
+          <h3>คะแนนเฉลี่ยชุด B: {averageScoreB.toFixed(2)}</h3>
+          <h3>คะแนนสุดท้ายจากการประเมิน (คิดเป็น 60%): {(averageScoreB / 100 * 60).toFixed(2)}</h3>
+        </div>
+      )}
+{evaluationsA.length > 0 && (
+  <div>
+    <h2>ผลการประเมินจากชุด A แต่ละคน</h2>
+    {evaluationsA.map((evalObj, index) => (
+      <p key={index}>ผู้ใช้ลำดับ {index + 1}: {evalObj.totalScore} คะแนน</p>
+    ))}
+  </div>
+)}
+
+{evaluationsB.length > 0 && (
+  <div>
+    <h2>ผลการประเมินจากชุด B แต่ละคน</h2>
+    {evaluationsB.map((evalObj, index) => (
+      <p key={index}>ผู้ใช้ลำดับ {index + 1}: {evalObj.totalScore} คะแนน</p>
+    ))}
+  </div>
+)}
+      {/* คำนวณคะแนนรวมสุดท้ายเมื่อมีราคาทั้ง A และ B */}
+      {priceA && priceB && (
+        <button onClick={handleFinalCalculation}>คำนวณคะแนนรวมสุดท้าย</button>
+      )}
+
+      {/* แสดงคะแนนรวมสุดท้าย */}
+      {finalScoreA && (
+        <div>
+          <h3>คะแนนรวมสุดท้ายสำหรับ A: {finalScoreA.toFixed(2)}</h3>
+          <p>คะแนนจากราคา (คิดเป็น 40%): {priceScoreA?.toFixed(2)}%</p>
+          <p>คะแนนจากการประเมิน (คิดเป็น 60%): {(averageScoreA / 100 * 60).toFixed(2)}%</p>
+        </div>
+      )}
+
+{finalScoreA && (
+  <div>
+    <h3>คะแนนรวมสุดท้ายสำหรับ A: {finalScoreA.toFixed(2)}</h3>
+    <p>คะแนนจากราคา (คิดเป็น 40%): {priceScoreA.toFixed(2)}%</p>
+    <p>คะแนนจากการประเมิน (คิดเป็น 60%): {(averageScoreA / 100 * 60).toFixed(2)}%</p>
+    <p>คะแนนร่วม (ราคา + ประเมิน): {(parseFloat(priceScoreA) + parseFloat((averageScoreA / 100 * 60).toFixed(2))).toFixed(2)}%</p>
+  </div>
+)}
+
+{finalScoreB && (
+  <div>
+    <h3>คะแนนรวมสุดท้ายสำหรับ B: {finalScoreB.toFixed(2)}</h3>
+    <p>คะแนนจากราคา (คิดเป็น 40%): {priceScoreB.toFixed(2)}%</p>
+    <p>คะแนนจากการประเมิน (คิดเป็น 60%): {(averageScoreB / 100 * 60).toFixed(2)}%</p>
+    <p>คะแนนร่วม (ราคา + ประเมิน): {(parseFloat(priceScoreB) + parseFloat((averageScoreB / 100 * 60).toFixed(2))).toFixed(2)}%</p>
+  </div>
+)}
     </div>
   );
 }
